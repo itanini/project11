@@ -71,20 +71,19 @@ class CompilationEngine:
             return
 
         kind = self.cur_token.text
-        next(self.generator) #type
+        next(self.generator)  #type
         type = self.cur_token.text
-        next(self.generator) #name
+        next(self.generator)  #name
         name = self.cur_token.text
 
-
         self.table.define(name, type, kind)
-        next(self.generator) # , \ ;
+        next(self.generator)  # , \ ;
 
         while self.cur_token.text == ",":
-            next(self.generator) # name
+            next(self.generator)  # name
             name = self.cur_token.text
             self.table.define(name, type, kind)
-            next(self.generator) # ,\ ;
+            next(self.generator)  # ,\ ;
         if self.cur_token.text in ["static", "field"]:
             self.compile_class_var_dec()
         self.compile_subroutine()
@@ -99,16 +98,13 @@ class CompilationEngine:
         if not self.cur_token or self.cur_token.text not in ["constructor", "function", "method"]:
             return
         while self.cur_token.text in ["constructor", "function", "method"]:# compile all function in class
-            next(self.generator) #return type
+            next(self.generator)  #return type
             self.cur_func = next(self.generator).text
-            next(self.generator) #(
+            next(self.generator)   # (
             n_args = self.compile_parameter_list()
-            self.writer.write_function(f'{self.class_name}.{self.cur_func}',n_args)
+            self.writer.write_function(f'{self.class_name}.{self.cur_func}', n_args)
             # subroutine body
-            self.cur_indent = +1
-            self.write_indent()
-            self.output_stream.write("<subroutineBody>\n")
-            self.eat(text=["{"], check_text=True)
+            next(self.generator)   # {
             CompilationEngine.COUNTER += 1
             while self.cur_token.text != "}":
                 if self.cur_token.text == "var":
@@ -123,30 +119,33 @@ class CompilationEngine:
         self.write_indent()
         self.cur_indent -= 1
 
-    def compile_parameter_list(self) -> None:
+    def compile_parameter_list(self) -> int:
         """Compiles a (possibly empty) parameter list, not including the 
         enclosing "()".
         """
-        self.cur_indent = +1
-        self.write_indent()
-        self.output_stream.write("<parameterList>\n")
+        args_counter = 0
+        next(self.generator)  # first arg type / )
         if self.cur_token.text == ")":  # if no parameters in the list
-            self.write_indent()
-            self.output_stream.write("</parameterList>\n")
-            self.cur_indent -=1
-            return
-        if self.cur_token.type == "identifier":
-            self.eat(typ=["identifier"], check_type=True)
-        else:
-            self.eat(text=["int", "char", "boolean"], check_text=True)
-        self.eat(typ=["identifier"], check_type=True)
+            return args_counter
+        # add args to symbol table:
+        kind = "ARG"
+        type = self.cur_token.text
+        next(self.generator)  # name
+        name = self.cur_token.text
+        self.table.define(name, type, kind)
+        self.writer.write_push("argument", self.table.index_of(name))
+        args_counter += 1
+#hi
+        next(self.generator)  # , or )
         while self.cur_token.text == ",":
-            self.eat(text=[","], check_text=True)
-            self.eat(text=["int", "char", "boolean"], check_text= True)
-            self.eat(typ=["identifier"], check_type=True)
-        self.write_indent()
-        self.output_stream.write("</parameterList>\n")
-        self.cur_indent -=1
+            type = self.cur_token.text
+            next(self.generator)  # name
+            name = self.cur_token.text
+            self.table.define(name, type, kind)
+            self.writer.write_push("argument", self.table.index_of(name))
+            args_counter += 1
+
+        return args_counter
 
     def compile_var_dec(self) -> None:
         """Compiles a var declaration."""
