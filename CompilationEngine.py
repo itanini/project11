@@ -76,6 +76,7 @@ class CompilationEngine:
         next(self.generator) #name
         name = self.cur_token.text
 
+
         self.table.define(name, type, kind)
         next(self.generator) # , \ ;
 
