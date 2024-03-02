@@ -19,7 +19,7 @@ class SymbolTable:
         """Creates a new empty symbol table."""
         # Your code goes here!
         self.table = pd.DataFrame({'Type': [], 'Kind': [], '#': []})
-
+        # shira gelbstein has changed the code
         pass
 
     def start_subroutine(self) -> None:
