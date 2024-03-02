@@ -135,7 +135,7 @@ class CompilationEngine:
         self.table.define(name, type, kind)
         self.writer.write_push("argument", self.table.index_of(name))
         args_counter += 1
-
+#hi
         next(self.generator)  # , or )
         while self.cur_token.text == ",":
             type = self.cur_token.text
