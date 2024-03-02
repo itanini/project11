@@ -6,6 +6,7 @@ as allowed by the Creative Common Attribution-NonCommercial-ShareAlike 3.0
 Unported [License](https://creativecommons.org/licenses/by-nc-sa/3.0/).
 """
 import typing
+
 import pandas as pd
 
 KINDS = ['VAR', 'ARG', 'STATIC', 'FIELD']
@@ -15,12 +16,12 @@ class SymbolTable:
     scopes (class/subroutine).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, name) -> None:
         """Creates a new empty symbol table."""
         # Your code goes here!
         self.table = pd.DataFrame({'Type': [], 'Kind': [], '#': []})
-        # shira gelbstein has changed the code
-        pass
+        self.className = name
+
 
     def start_subroutine(self) -> None:
         """Starts a new subroutine scope (i.e., resets the subroutine's 

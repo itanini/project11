@@ -7,6 +7,8 @@ Unported [License](https://creativecommons.org/licenses/by-nc-sa/3.0/).
 """
 import typing
 import JackTokenizer
+import SymbolTable
+import VMWriter
 from JackTokenizer import Token
 
 
@@ -32,7 +34,10 @@ class CompilationEngine:
         self.tokenizer = input_stream
         self.generator = input_stream.token_generator()
         self.cur_token: Token = next(self.generator)
-        self.cur_indent = 0
+        self.class_name = next(self.generator)
+        self.table = SymbolTable.SymbolTable(self.class_name)
+        self.cur_func = None
+        self.writer= VMWriter.VMWriter(output_stream)
 
     def eat(self, typ: list = None, text: list = None, check_type = False, check_text = False):  # eat function
         if self.cur_token:  # checking if reaches end of file
@@ -48,13 +53,7 @@ class CompilationEngine:
 
     def compile_class(self) -> None:
         """Compiles a complete class."""
-        self.cur_indent += 1
-        self.write_indent()
-        self.output_stream.write("<class>\n")
-        self.cur_indent += 1
-        self.eat(text = ["class"], check_text= True)
-        self.eat(typ = ["identifier"], check_type= True)
-        self.eat(text = ["{"], check_text= True)
+        next(self.generator) #{
 
         self.compile_class_var_dec()
 
@@ -67,31 +66,24 @@ class CompilationEngine:
 
     def compile_class_var_dec(self) -> None:
         """Compiles a static declaration or a field declaration."""
-        if not self.cur_token:
-            return
         if self.cur_token.text not in ["static", "field"]:  # if there are no fields in the begin of class
-            self.compile_subroutine()
-            self.write_indent()
-            self.cur_indent -= 1
+            self.compile_subroutine() #TODO
             return
 
-        self.cur_indent += 1
-        self.write_indent()
-        self.output_stream.write("<classVarDec>\n")
-        if self.cur_token.text in ["static", "field"]:  # compile all the fields of class
-            self.eat(text=["static", "field"], check_text= True)
-            if self.cur_token.text in ["int", "char", "boolean"]:
-                self.eat(text=["int", "char", "boolean"], check_text= True)
-            else:
-                self.eat(typ=["identifier"], check_type= True)
-            self.eat(typ=["identifier"], check_type=True)
-            while self.cur_token.text == ",":
-                self.eat(text=[","], check_text=True)
-                self.eat(typ=["identifier"], check_type=True)
-            self.eat(text=[";"], check_text=True)
-        self.write_indent()
-        self.output_stream.write("</classVarDec>\n")
-        self.cur_indent -= 1
+        kind = self.cur_token.text
+        next(self.generator) #type
+        type = self.cur_token.text
+        next(self.generator) #name
+        name = self.cur_token.text
+
+        self.table.define(name, type, kind)
+        next(self.generator) # , \ ;
+
+        while self.cur_token.text == ",":
+            next(self.generator) # name
+            name = self.cur_token.text
+            self.table.define(name, type, kind)
+            next(self.generator) # ,\ ;
         if self.cur_token.text in ["static", "field"]:
             self.compile_class_var_dec()
         self.compile_subroutine()
@@ -102,23 +94,15 @@ class CompilationEngine:
         You can assume that classes with constructors have at least one field,
         you will understand why this is necessary in project 11.
         """
+        self.table.start_subroutine()
         if not self.cur_token or self.cur_token.text not in ["constructor", "function", "method"]:
             return
-        self.cur_indent += 1
-        self.write_indent()
-
-        while self.cur_token.text in ["constructor", "function", "method"]:  # compile all function in class
-            self.output_stream.write("<subroutineDec>\n")
-            self.eat(text=["constructor", "function", "method"], check_text=True)
-            if self.cur_token.type == "identifier":
-                self.eat(typ=["identifier"], check_type=True)
-            else:
-                self.eat(text=["int", "char", "boolean", "void"], check_text=True)
-
-            self.eat(typ=["identifier"], check_type=True)
-            self.eat(text=["("], check_text=True)
-            self.compile_parameter_list()
-            self.eat(text=[")"], check_text=True)
+        while self.cur_token.text in ["constructor", "function", "method"]:# compile all function in class
+            next(self.generator) #return type
+            self.cur_func = next(self.generator).text
+            next(self.generator) #(
+            n_args = self.compile_parameter_list()
+            self.writer.write_function(f'{self.class_name}.{self.cur_func}',n_args)
             # subroutine body
             self.cur_indent = +1
             self.write_indent()
