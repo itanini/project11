@@ -34,7 +34,7 @@ class CompilationEngine:
         self.tokenizer = input_stream
         self.generator = input_stream.token_generator()
         self.cur_token: Token = next(self.generator)
-        self.class_name = next(self.generator).txt
+        self.class_name = next(self.generator)
         self.table = SymbolTable.SymbolTable(self.class_name)
         self.cur_func = None
         self.writer= VMWriter.VMWriter(output_stream)
@@ -104,19 +104,13 @@ class CompilationEngine:
             self.writer.write_function(f'{self.class_name}.{self.cur_func}', n_args)
             # subroutine body
             self.cur_token = next(self.generator) # {
-            CompilationEngine.COUNTER += 1
             while self.cur_token.text != "}":
+                next(self.generator)  # var / let / do / if / while / return
                 if self.cur_token.text == "var":
                     self.compile_var_dec()
                 elif self.cur_token.text in ["let", "do", "if", "while", "return"]:
                     self.compile_statements()
-            self.eat(text=["}"], check_text=True)
-            self.write_indent()
-            self.output_stream.write("</subroutineBody>\n")
-            self.cur_indent -= 1
-            self.output_stream.write("</subroutineDec>\n")
-        self.write_indent()
-        self.cur_indent -= 1
+            next(self.generator)   # }
 
     def compile_parameter_list(self) -> int:
         """Compiles a (possibly empty) parameter list, not including the 
@@ -134,8 +128,8 @@ class CompilationEngine:
         self.table.define(name, type, kind)
         self.writer.write_push("argument", self.table.index_of(name))
         args_counter += 1
-#hi
-        self.cur_token = next(self.generator) # , or )
+
+        next(self.generator)  # , or )
         while self.cur_token.text == ",":
             type = self.cur_token.text
             self.cur_token = next(self.generator) # name
@@ -167,9 +161,6 @@ class CompilationEngine:
         """Compiles a sequence of statements, not including the enclosing
         "{}".
         """
-        self.cur_indent = + 1
-        self.write_indent()
-        self.output_stream.write("<statements>\n")
         while self.cur_token.text in ["let", "do", "if", "while", "return"]:
             if self.cur_token.text == "let":
                 self.compile_let()
@@ -184,7 +175,6 @@ class CompilationEngine:
         self.write_indent()
         self.output_stream.write("</statements>\n")
         self.cur_indent -= 1
-
 
     def compile_do(self) -> None:
         """Compiles a do statement."""
@@ -206,11 +196,8 @@ class CompilationEngine:
 
     def compile_let(self) -> None:
         """Compiles a let statement."""
-        self.cur_indent += 1
-        self.write_indent()
-        self.output_stream.write("<letStatement>\n")
-        self.eat(text=["let"], check_text=True)
-        self.eat(typ=['identifier'], check_type=True)
+        self.cur_token = next(self.generator)  # let
+        name = next(self.generator)
         if self.cur_token and self.cur_token.text == "[":
             self.eat(text=["["], check_text=True)
             self.compile_expression()
