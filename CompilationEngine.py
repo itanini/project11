@@ -57,12 +57,8 @@ class CompilationEngine:
 
         self.compile_class_var_dec()
 
-        self.eat(text = ["}"], check_text= True)
-        # if self.cur_token:  # not a function or a class field
-        #     raise Exception("illegal format")
-        self.write_indent()
-        self.output_stream.write("</class>\n")
-        self.cur_indent -=1
+        next(self.generator) #}
+
 
     def compile_class_var_dec(self) -> None:
         """Compiles a static declaration or a field declaration."""
@@ -75,8 +71,6 @@ class CompilationEngine:
         type = self.cur_token.text
         next(self.generator) #name
         name = self.cur_token.text
-
-
         self.table.define(name, type, kind)
         next(self.generator) # , \ ;
 
@@ -104,24 +98,16 @@ class CompilationEngine:
             next(self.generator) #(
             n_args = self.compile_parameter_list()
             self.writer.write_function(f'{self.class_name}.{self.cur_func}',n_args)
-            # subroutine body
-            self.cur_indent = +1
-            self.write_indent()
-            self.output_stream.write("<subroutineBody>\n")
-            self.eat(text=["{"], check_text=True)
-            CompilationEngine.COUNTER += 1
+            # subroutine body. cur_token.txt == {
+            next(self.generator)
             while self.cur_token.text != "}":
                 if self.cur_token.text == "var":
                     self.compile_var_dec()
                 elif self.cur_token.text in ["let", "do", "if", "while", "return"]:
                     self.compile_statements()
+            # cur_token.txt == }
             self.eat(text=["}"], check_text=True)
-            self.write_indent()
-            self.output_stream.write("</subroutineBody>\n")
-            self.cur_indent -= 1
-            self.output_stream.write("</subroutineDec>\n")
-        self.write_indent()
-        self.cur_indent -= 1
+        next(self.generator)
 
     def compile_parameter_list(self) -> None:
         """Compiles a (possibly empty) parameter list, not including the 
@@ -150,16 +136,11 @@ class CompilationEngine:
 
     def compile_var_dec(self) -> None:
         """Compiles a var declaration."""
-        self.cur_indent = +1
-        self.write_indent()
-        self.output_stream.write("<varDec>\n")
         self.eat(text=["var"], check_text=True)
-        if self.cur_token and self.cur_token.type == "keyword":
-            self.eat(text= ["int", "char", "boolean"], check_text=True)
-        elif self.cur_token and self.cur_token.type == "identifier":
-            self.eat(typ=["identifier"], check_type= True)
-        else:
-            raise Exception(f'No Type declaration')
+        kind = "VAR"
+        next(self.generator)
+        type = self.cur_token.text
+        next(self.generator)
         self.eat(typ=["identifier"], check_type=True)
         while self.cur_token.text == ",":
             self.eat(text=[","], check_text=True)
