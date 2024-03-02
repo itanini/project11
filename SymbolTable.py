@@ -6,22 +6,23 @@ as allowed by the Creative Common Attribution-NonCommercial-ShareAlike 3.0
 Unported [License](https://creativecommons.org/licenses/by-nc-sa/3.0/).
 """
 import typing
-
 import pandas as pd
 
 KINDS = ['VAR', 'ARG', 'STATIC', 'FIELD']
+
+
 class SymbolTable:
     """A symbol table that associates names with information needed for Jack
     compilation: type, kind and running index. The symbol table has two nested
     scopes (class/subroutine).
     """
 
-    def __init__(self, name) -> None:
+    def __init__(self) -> None:
         """Creates a new empty symbol table."""
         # Your code goes here!
         self.table = pd.DataFrame({'Type': [], 'Kind': [], '#': []})
-        self.className = name
-
+        # shira gelbstein has changed the code
+        pass
 
     def start_subroutine(self) -> None:
         """Starts a new subroutine scope (i.e., resets the subroutine's 
