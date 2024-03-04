@@ -21,6 +21,7 @@ class CompilationEngine:
     output stream.
     """
     COUNTER = 0
+
     def __init__(self, input_stream: JackTokenizer, output_stream) -> None:
         """
         Creates a new compilation engine with the given input and output. The
@@ -33,55 +34,39 @@ class CompilationEngine:
         self.output_stream = output_stream
         self.tokenizer = input_stream
         self.generator = input_stream.token_generator()
-        self.cur_token: Token = next(self.generator)
-        self.class_name = next(self.generator)
-        self.table = SymbolTable.SymbolTable(self.class_name)
+        self.cur_token = next(self.generator)
+        self.class_name = next(self.generator).text
+        self.table = SymbolTable.SymbolTable()
         self.cur_func = None
-        self.writer= VMWriter.VMWriter(output_stream)
-
-    def eat(self, typ: list = None, text: list = None, check_type = False, check_text = False):  # eat function
-        if self.cur_token:  # checking if reaches end of file
-            # if check_type and self.cur_token.type not in typ:
-            #     raise Exception(f'Expected to get a token from type {typ} but got {self.cur_token.text} from type {self.cur_token.type} instead')
-            # elif check_text and self.cur_token.text not in text:
-            #     raise Exception(f'Expected to get a token from {text} but got {self.cur_token.text} instead')
-            self.write_indent()
-            self.output_stream.write(self.cur_token.token_string())
-            self.cur_token = next(self.generator)
-            return
-        raise Exception("NO TOKEN TO WRITE")
+        self.writer = VMWriter.VMWriter(output_stream)
 
     def compile_class(self) -> None:
-        """Compiles a complete class."""
-        self.cur_token = next(self.generator) #{
-
+        # """Compiles a complete class."""
+        # self.cur_token = next(self.generator)  # class
+        self.cur_token = next(self.generator)  # {
         self.compile_class_var_dec()
-
-        self.cur_token = next(self.generator) #{
-
-
-
+        self.cur_token = next(self.generator)  # }
 
     def compile_class_var_dec(self) -> None:
         """Compiles a static declaration or a field declaration."""
         if self.cur_token.text not in ["static", "field"]:  # if there are no fields in the begin of class
-            self.compile_subroutine() #TODO
+            self.compile_subroutine()
             return
 
         kind = self.cur_token.text
-        self.cur_token = next(self.generator)  #type
+        self.cur_token = next(self.generator)   # type
         type = self.cur_token.text
-        self.cur_token = next(self.generator) #name
+        self.cur_token = next(self.generator)  # ame
         name = self.cur_token.text
 
         self.table.define(name, type, kind)
-        self.cur_token = next(self.generator) # , \ ;
+        self.cur_token = next(self.generator)  # , \ ;
 
         while self.cur_token.text == ",":
-            self.cur_token = next(self.generator) # name
+            self.cur_token = next(self.generator)  # name
             name = self.cur_token.text
             self.table.define(name, type, kind)
-            self.cur_token = next(self.generator) # ,\ ;
+            self.cur_token = next(self.generator)  # ,\ ;
         if self.cur_token.text in ["static", "field"]:
             self.compile_class_var_dec()
         self.compile_subroutine()
@@ -95,17 +80,17 @@ class CompilationEngine:
         self.table.start_subroutine()
         if not self.cur_token or self.cur_token.text not in ["constructor", "function", "method"]:
             return
-        while self.cur_token.text in ["constructor", "function", "method"]:# compile all function in class
-            self.cur_token = next(self.generator) #return type
+        while self.cur_token.text in ["constructor", "function", "method"]:  # compile all function in class
+            self.cur_token = next(self.generator)  # return type
             self.cur_token = next(self.generator)
             self.cur_func = self.cur_token.text
             self.cur_token = next(self.generator)  # (
             n_args = self.compile_parameter_list()
             self.writer.write_function(f'{self.class_name}.{self.cur_func}', n_args)
             # subroutine body
-            self.cur_token = next(self.generator) # {
+            self.cur_token = next(self.generator)  # {
             while self.cur_token.text != "}":
-                next(self.generator)  # var / let / do / if / while / return
+                self.cur_token= next(self.generator)  # var / let / do / if / while / return
                 if self.cur_token.text == "var":
                     self.compile_var_dec()
                 elif self.cur_token.text in ["let", "do", "if", "while", "return"]:
@@ -117,7 +102,7 @@ class CompilationEngine:
         enclosing "()".
         """
         args_counter = 0
-        self.cur_token = next(self.generator) # first arg type / )
+        self.cur_token = next(self.generator)  # first arg type / )
         if self.cur_token.text == ")":  # if no parameters in the list
             return args_counter
         # add args to symbol table:
@@ -132,7 +117,7 @@ class CompilationEngine:
         next(self.generator)  # , or )
         while self.cur_token.text == ",":
             type = self.cur_token.text
-            self.cur_token = next(self.generator) # name
+            self.cur_token = next(self.generator)  # name
             name = self.cur_token.text
             self.table.define(name, type, kind)
             self.writer.write_push("argument", self.table.index_of(name))
@@ -147,7 +132,7 @@ class CompilationEngine:
         type = self.cur_token.text
         self.cur_token = next(self.generator)
         name = self.cur_token.text
-        self.table.define(name,type,kind)
+        self.table.define(name, type, kind)
         self.cur_token = next(self.generator) # ,\;
         while self.cur_token.text == ",":
             self.cur_token = next(self.generator)
@@ -155,7 +140,6 @@ class CompilationEngine:
             self.table.define(name, type, kind)
             self.cur_token = next(self.generator)
         self.cur_token = next(self.generator)
-
 
     def compile_statements(self) -> None:
         """Compiles a sequence of statements, not including the enclosing
@@ -172,60 +156,58 @@ class CompilationEngine:
                 self.compile_while()
             if self.cur_token.text == "return":
                 self.compile_return()
-        self.write_indent()
-        self.output_stream.write("</statements>\n")
-        self.cur_indent -= 1
 
     def compile_do(self) -> None:
         """Compiles a do statement."""
-        self.cur_indent =+ 1
-        self.write_indent()
-        self.output_stream.write("<doStatement>\n")
-        self.eat(text=["do"], check_text=True)
-        self.eat(typ=['identifier'], check_type=True)
+        next(self.generator)  # do
+        name = ""
+        self.cur_token = next(self.generator)  # class name
+        name += self.cur_token
+        self.cur_token = next(self.generator)  # ./(
         if self.cur_token and self.cur_token.text == ".":
-            self.eat(text=["."], check_text=True)
-            self.eat(typ=['identifier'], check_type=True)
-        self.eat(text=['('], check_text=True)
-        self.compile_expression_list()
-        self.eat(text=[')'], check_text=True)
-        self.eat(text=[";"], check_text=True)
-        self.write_indent()
-        self.output_stream.write("</doStatement>\n")
-        self.cur_indent -= 1
+            name += "."
+            self.cur_token = next(self.generator)  # subroutine name
+            name += self.cur_token
+
+        next(self.generator)  # (
+        n_args: int = self.compile_expression_list()
+        next(self.generator)  # )
+        next(self.generator)  # ;
+        self.writer.write_call(name,n_args)
 
     def compile_let(self) -> None:
         """Compiles a let statement."""
-        self.cur_token = next(self.generator)  # let
+        next(self.generator)  # let
         name = next(self.generator)
-        if self.cur_token and self.cur_token.text == "[":
+        if self.cur_token and self.cur_token.text == "[":  #TODO
+
             self.eat(text=["["], check_text=True)
-            self.compile_expression()
+            constant = self.compile_expression()
+            self.writer.write_push("constant", constant)
             self.eat(text=["]"], check_text=True)
         self.eat(text=["="], check_text=True)
+
         self.compile_expression()
-        self.eat(text=[";"], check_text=True)
-        self.write_indent()
-        self.output_stream.write("</letStatement>\n")
-        self.cur_indent -= 1
+        self.writer.write_pop(self.table.kind_of(name), self.table.index_of(name))  # pop the first value in the stuck
+        self.cur_token = next(self.generator)  # ;
 
     def compile_while(self) -> None:
         """Compiles a while statement."""
-        self.cur_indent += 1
-        self.write_indent()
-        self.output_stream.write("<whileStatement>\n")
-        self.eat(text=["while"], check_text=True)
-        self.eat(text=["("], check_text=True)
+        self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # back to while label
+        CompilationEngine.COUNTER += 1
+        next(self.generator)  # while
+        next(self.generator)  # (
         self.compile_expression()
-        self.eat(text=[")"], check_text=True)
-        self.eat(text=["{"], check_text=True)
-        self.compile_statements()
-        self.eat(text=["}"], check_text=True)
-        self.write_indent()
-        self.output_stream.write("</whileStatement>\n")
-        self.cur_indent -= 1
+        next(self.generator)  # )
+        self.writer.write_arithmetic("neg")  # if not expression
+        self.writer.write_if(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # out of the while label
+        next(self.generator)  # {
+        self.compile_statements()  # not sure cus statments can be here function calls as well
+        next(self.generator)  # }
+        self.writer.write_goto(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER-1}')
+        self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')
 
-    def compile_return(self) -> None:
+    def compile_return(self) -> None:   #TODO
         """Compiles a return statement."""
         self.cur_indent += 1
         self.write_indent()
@@ -240,26 +222,27 @@ class CompilationEngine:
 
     def compile_if(self) -> None:
         """Compiles a if statement, possibly with a trailing else clause."""
-        self.cur_indent += 1
-        self.write_indent()
-        self.output_stream.write("<ifStatement>\n")
-        self.eat(text=["if"], check_text=True)
-        self.eat(text=["("], check_text=True)
+        next(self.generator)  # if
+        next(self.generator)  # (
         self.compile_expression()
-        self.eat(text=[")"], check_text=True)
-        self.eat(text= ["{"], check_text=True)
-        self.compile_statements()
-        self.eat(text=["}"], check_text=True)
+        next(self.generator)  # )
+        self.writer.write_arithmetic("neg")  # if not expression
+        self.writer.write_goto(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # go to label 1
+        next(self.generator)  # {
+        self.compile_statements()  # needs more than that
+        next(self.generator)  # }
         if self.cur_token and self.cur_token.text == "else":
-            self.eat(text=["else"], check_text=True)
-            self.eat(text=["{"], check_text=True)
-            self.compile_statements()
-            self.eat(text=["}"], check_text=True)
-        self.write_indent()
-        self.output_stream.write("</ifStatement>\n")
-        self.cur_indent -= 1
+            self.writer.write_goto(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER+1}')  # go to label L2
+            self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # label L1
+            next(self.generator)  # else
+            next(self.generator)  # {
+            self.compile_statements()  # needs more than that
+            next(self.generator)  # }
+            self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER+1}')  # label L2
+            return
+        self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # label L1 if no else
 
-    def compile_expression(self) -> None:
+    def compile_expression(self) -> int:
         """Compiles an expression."""
         self.cur_indent = +1
         self.write_indent()
@@ -271,6 +254,7 @@ class CompilationEngine:
         self.write_indent()
         self.output_stream.write("</expression>\n")
         self.cur_indent = -1
+        return 0
 
     def compile_term(self) -> None:
         """Compiles a term.
@@ -318,8 +302,7 @@ class CompilationEngine:
         self.output_stream.write("</term>\n")
         self.cur_indent = -1
 
-
-    def compile_expression_list(self) -> None:
+    def compile_expression_list(self) -> int:  # should count how many arguments are in the function
         """Compiles a (possibly empty) comma-separated list of expressions."""
         self.cur_indent += 1
         self.write_indent()
@@ -328,7 +311,7 @@ class CompilationEngine:
             self.write_indent()
             self.output_stream.write("</expressionList>\n")
             self.cur_indent -= 1
-            return
+            return 0
         self.compile_expression()
         while self.cur_token.text == ",":
             self.eat(text= [','], check_text= True)
@@ -342,3 +325,16 @@ class CompilationEngine:
         for i in range(self.cur_indent):
             indent = indent + " "
         self.output_stream.write(indent)
+
+
+    def eat(self, typ: list = None, text: list = None, check_type = False, check_text = False):  # eat function
+        if self.cur_token:  # checking if reaches end of file
+            # if check_type and self.cur_token.type not in typ:
+            #     raise Exception(f'Expected to get a token from type {typ} but got {self.cur_token.text} from type {self.cur_token.type} instead')
+            # elif check_text and self.cur_token.text not in text:
+            #     raise Exception(f'Expected to get a token from {text} but got {self.cur_token.text} instead')
+            self.write_indent()
+            self.output_stream.write(self.cur_token.token_string())
+            self.cur_token = next(self.generator)
+            return
+        raise Exception("NO TOKEN TO WRITE")

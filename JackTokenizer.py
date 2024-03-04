@@ -177,7 +177,6 @@ class JackTokenizer:
             return False
         return True
 
-
     def advance(self):
         """Gets the next token from the input and makes it the current token. 
         This method should be called if has_more_tokens() is true. 
@@ -187,7 +186,6 @@ class JackTokenizer:
         token_type = self.token_type(cur_token_text)
         cur_token_text = self.process_token(cur_token_text, token_type)
         return Token(cur_token_text, token_type)
-
 
     def token_type(self, token_text) -> str:
         """
