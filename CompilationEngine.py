@@ -31,7 +31,8 @@ class CompilationEngine:
         """
         self.output_stream = output_stream
         self.tokenizer = input_stream
-        self.cur_token: Token = next(next(self.tokenizer.token_generator()))
+        self.cur_token = next(self.tokenizer.token_generator())
+        self.cur_token = next(self.tokenizer.token_generator())
         self.class_name = self.cur_token.text
         self.table = SymbolTable.SymbolTable()
         self.cur_func = None
@@ -39,7 +40,7 @@ class CompilationEngine:
 
     def compile_class(self) -> None:
         # """Compiles a complete class."""
-        # self.cur_token = next(self.generator)  # class
+        self.cur_token = next(self.tokenizer.token_generator())  # class
         self.cur_token = next(self.tokenizer.token_generator())  # {
         self.compile_class_var_dec()
         self.cur_token = next(self.tokenizer.token_generator())  # }
@@ -79,7 +80,7 @@ class CompilationEngine:
             return
         while self.cur_token.text in ["constructor", "function", "method"]:  # compile all function in class
             self.cur_token = next(self.tokenizer.token_generator())  # return type
-            self.next_token()
+            self.cur_token = next(self.tokenizer.token_generator())
             self.cur_func = self.cur_token.text
             self.cur_token = next(self.tokenizer.token_generator())  # (
             n_args = self.compile_parameter_list()
@@ -105,7 +106,7 @@ class CompilationEngine:
         # add args to symbol table:
         kind = "ARG"
         type = self.cur_token.text
-        self.cur_token = next(self.tokenizer.token_generator()) # name
+        self.cur_token = next(self.tokenizer.token_generator())  # name
         name = self.cur_token.text
         self.table.define(name, type, kind)
         self.writer.write_push("argument", self.table.index_of(name))
@@ -125,18 +126,18 @@ class CompilationEngine:
     def compile_var_dec(self) -> None:
         """Compiles a var declaration."""
         kind = "VAR"
-        self.next_token()
+        self.cur_token = next(self.tokenizer.token_generator())
         type = self.cur_token.text
-        self.next_token()
+        self.cur_token = next(self.tokenizer.token_generator())
         name = self.cur_token.text
         self.table.define(name, type, kind)
         self.cur_token = next(self.tokenizer.token_generator()) # ,\;
         while self.cur_token.text == ",":
-            self.next_token()
+            self.cur_token = next(self.tokenizer.token_generator())
             name = self.cur_token.text
             self.table.define(name, type, kind)
-            self.next_token()
-        self.next_token()
+            self.cur_token = next(self.tokenizer.token_generator())
+        self.cur_token = next(self.tokenizer.token_generator())
 
     def compile_statements(self) -> None:
         """Compiles a sequence of statements, not including the enclosing
@@ -156,35 +157,40 @@ class CompilationEngine:
 
     def compile_do(self) -> None:
         """Compiles a do statement."""
-        next(self.tokenizer.token_generator())  # do
-        name = ""
         self.cur_token = next(self.tokenizer.token_generator())  # class name
-        name += self.cur_token
+        name = ""
+        name += self.cur_token.text
         self.cur_token = next(self.tokenizer.token_generator())  # ./(
         if self.cur_token and self.cur_token.text == ".":
             name += "."
             self.cur_token = next(self.tokenizer.token_generator())  # subroutine name
-            name += self.cur_token
+            name += self.cur_token.text
 
         next(self.tokenizer.token_generator())  # (
         n_args: int = self.compile_expression_list()
         next(self.tokenizer.token_generator())  # )
         next(self.tokenizer.token_generator())  # ;
-        self.writer.write_call(name,n_args)
+        self.writer.write_call(name, n_args)
 
     def compile_let(self) -> None:
         """Compiles a let statement."""
         self.cur_token = next(self.tokenizer.token_generator())  # let
-        self.next_token()
-        name = self.cur_token.text
-        if self.cur_token and self.cur_token.text == "[":  #TODO
+        name = self.cur_token  # variable name
+        self.cur_token = next(self.tokenizer.token_generator())  # [ or =
+        if self.cur_token and self.cur_token.text == "[":
+            self.writer.write_push(self.table.kind_of(name), self.table.index_of(name))
+            next(self.tokenizer.token_generator())  # [
+            next(self.tokenizer.token_generator())  # expression
+            self.compile_expression()
+            next(self.tokenizer.token_generator())  # ]
+            next(self.tokenizer.token_generator())  # =
+            self.compile_expression()
+            self.writer.write_pop("temp", 0)
+            self.writer.write_pop("pointer", 1)
+            self.writer.write_push("temp", 0)
+            self.writer.write_pop("that", 0)
 
-            self.eat(text=["["], check_text=True)
-            constant = self.compile_expression()
-            self.writer.write_push("constant", constant)
-            self.eat(text=["]"], check_text=True)
-        self.eat(text=["="], check_text=True)
-
+        next(self.tokenizer.token_generator())  # =
         self.compile_expression()
         self.writer.write_pop(self.table.kind_of(name), self.table.index_of(name))  # pop the first value in the stuck
         self.cur_token = next(self.tokenizer.token_generator())  # ;
@@ -197,7 +203,7 @@ class CompilationEngine:
         next(self.tokenizer.token_generator())  # (
         self.compile_expression()
         next(self.tokenizer.token_generator())  # )
-        self.writer.write_arithmetic("neg")  # if not expression
+        self.writer.write_arithmetic("not")  # if not expression
         self.writer.write_if(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # out of the while label
         next(self.tokenizer.token_generator())  # {
         self.compile_statements()  # not sure cus statments can be here function calls as well
@@ -205,26 +211,23 @@ class CompilationEngine:
         self.writer.write_goto(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER-1}')
         self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')
 
-    def compile_return(self) -> None:   #TODO
+    def compile_return(self) -> None:
         """Compiles a return statement."""
-        self.cur_indent += 1
-        self.write_indent()
-        self.output_stream.write("<returnStatement>\n")
-        self.eat(text=["return"], check_text=True)
-        if self.cur_token.text != ";":
+        self.cur_token = next(self.tokenizer.token_generator())  # return
+        if self.cur_token.text == ";":
+            self.writer.write_push("constant", 0)  # returning void
+        else:
             self.compile_expression()
-        self.eat(text=[";"], check_text=True)
-        self.write_indent()
-        self.output_stream.write("</returnStatement>\n")
-        self.cur_indent -= 1
+        self.writer.write_return()
+        next(self.tokenizer.token_generator())  # ;
 
     def compile_if(self) -> None:
         """Compiles a if statement, possibly with a trailing else clause."""
         self.cur_token =  next(self.tokenizer.token_generator())  # if
         self.cur_token =  next(self.tokenizer.token_generator())  # (
         self.compile_expression()
-        self.cur_token =  next(self.tokenizer.token_generator())  # )
-        self.writer.write_arithmetic("neg")  # if not expression
+        next(self.tokenizer.token_generator())  # )
+        self.writer.write_arithmetic("not")  # if not expression
         self.writer.write_goto(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # go to label 1
         self.cur_token =  next(self.tokenizer.token_generator())  # {
         self.compile_statements()  # needs more than that
@@ -245,7 +248,7 @@ class CompilationEngine:
         self.compile_term()
         while self.cur_token.text in JackTokenizer.BINARY_OPERATORS:
             op = self.cur_token.text
-            self.next_token()
+            self.cur_token = next(self.tokenizer.token_generator())
             self.compile_term()
             self.writer.write_arithmetic(op)
 
@@ -316,37 +319,15 @@ class CompilationEngine:
 
     def compile_expression_list(self) -> int:  # should count how many arguments are in the function
         """Compiles a (possibly empty) comma-separated list of expressions."""
-        self.cur_indent += 1
-        self.write_indent()
-        self.output_stream.write("<expressionList>\n")
+        n_args_counter = 0
         if self.cur_token.text == ")":
-            self.write_indent()
-            self.output_stream.write("</expressionList>\n")
-            self.cur_indent -= 1
-            return 0
+            return n_args_counter
         self.compile_expression()
+        n_args_counter += 1
         while self.cur_token.text == ",":
-            self.eat(text= [','], check_text= True)
+            next(self.tokenizer.token_generator())  # ,
             self.compile_expression()
-        self.write_indent()
-        self.output_stream.write("</expressionList>\n")
-        self.cur_indent -= 1
-
-    def write_indent(self):
-        indent = ""
-        for i in range(self.cur_indent):
-            indent = indent + " "
-        self.output_stream.write(indent)
+        return n_args_counter
 
 
-    def eat(self, typ: list = None, text: list = None, check_type = False, check_text = False):  # eat function
-        if self.cur_token:  # checking if reaches end of file
-            # if check_type and self.cur_token.type not in typ:
-            #     raise Exception(f'Expected to get a token from type {typ} but got {self.cur_token.text} from type {self.cur_token.type} instead')
-            # elif check_text and self.cur_token.text not in text:
-            #     raise Exception(f'Expected to get a token from {text} but got {self.cur_token.text} instead')
-            self.write_indent()
-            self.output_stream.write(self.cur_token.token_string())
-            self.next_token()
-            return
-        raise Exception("NO TOKEN TO WRITE")
+
