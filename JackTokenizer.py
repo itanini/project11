@@ -7,6 +7,7 @@ Unported [License](https://creativecommons.org/licenses/by-nc-sa/3.0/).
 """
 import typing
 import re
+from enum import Enum
 
 END_COMMENT = ['//']
 COMMENT = ['/*', '*/']
@@ -26,6 +27,7 @@ LIST_SEPARATOR=[',']
 STATEMENT_TERMINATOR = [';']
 CLASS_MEMBERSHIP = ['.']
 OPERATORS = ['+','-','*','/','&amp;','|','~', '&lt;','&gt;','^','#',"="]
+BINARY_OPERATORS = ['+','-','*','/','<','>']
 SYMBOLS = set(ARITHMETIC_GROUPING+ARRAY_INDEXING+STATEMENT_GROUPING+LIST_SEPARATOR+STATEMENT_TERMINATOR+
               CLASS_MEMBERSHIP+OPERATORS+ ['<', '>', '&'])
 
@@ -38,7 +40,9 @@ OBJECTIVE_REFERENCE = ['this']
 
 KEYWORD = set(PROGRAM_COMPONENTS+PRIMITIVE_TYPES+VARIABLE_DECLARATIONS+STATEMENTS+CONSTANT_VALUES+OBJECTIVE_REFERENCE)
 
-REGEX = r'\".*\"|\w+|\/\/|\*\/|\/\*+|-|\*\/|&|\||~|<|>|\(|\)|\[|\]|\{|}|,|;|=|\.|\+|-|\*|\/|&|\||~|<|>|\^|#'
+OPERATORS_REGEX = r'\+|\-|\*|\/'
+PARENTHESIS_REGEX = r'\(.[^)(]*\)'
+REGEX = r'\w+|\".[^"]*\"|\/\/|\*\/|\/\*|-|\*\/|&|\||~|<|>|\(|\)|\[|\]|\{|}|,|;|=|\.|\+|-|\*|\/|&|\||~|<|>|\^|#|\n'
 
 
 class JackTokenizer:
@@ -134,9 +138,10 @@ class JackTokenizer:
         # Your code goes here!
         # A good place to start is to read all the lines of the input:
         self.cur_token = None
-        self.cur_line = None
-        comment_clean_input = self.comment_cleaner(input_stream)
-        self.input_lines = [line for line in comment_clean_input.splitlines() if line != '']
+        self.text = re.findall(REGEX, input_stream.read())
+        self.comment = Comment.NOT_COMMENT
+        # comment_clean_input = self.comment_cleaner(input_stream)
+        # self.input_lines = [line for line in comment_clean_input.splitlines() if line != '']
         pass
 
     def comment_cleaner(self, input_stream):
@@ -149,11 +154,10 @@ class JackTokenizer:
         return comment_clean_input
 
     def token_generator(self):
-        for cur_line in self.input_lines:
-            self.cur_line = re.findall(REGEX, cur_line)
-            while self.has_more_tokens():
-                yield self.advance()
+        if self.has_more_tokens():
+            yield self.advance()
         yield None
+
 
     def process_token(self, cur_token_text, token_type):
         if token_type == "symbol":
@@ -173,19 +177,38 @@ class JackTokenizer:
         Returns:
             bool: True if there are more tokens, False otherwise.
         """
-        if not self.cur_line:
+        if not self.text:
             return False
         return True
 
+
     def advance(self):
-        """Gets the next token from the input and makes it the current token. 
-        This method should be called if has_more_tokens() is true. 
+        """Gets the next token from the input and makes it the current token.
+        This method should be called if has_more_tokens() is true.
         Initially there is no current token.
         """
-        cur_token_text = self.cur_line.pop(0)
-        token_type = self.token_type(cur_token_text)
-        cur_token_text = self.process_token(cur_token_text, token_type)
-        return Token(cur_token_text, token_type)
+        if self.has_more_tokens():
+            cur_token_text = self.text.pop(0)
+            if self.comment == Comment.NOT_COMMENT and cur_token_text in ["/*", "/**"]:
+                self.comment = Comment.CLOSED_COMMENT
+                return self.advance()
+            elif self.comment == Comment.CLOSED_COMMENT and cur_token_text == "*/":
+                self.comment = Comment.NOT_COMMENT
+                return self.advance()
+            elif self.comment == Comment.NOT_COMMENT and cur_token_text == "//":
+                self.comment = Comment.OPEN_COMMENT
+                return self.advance()
+            elif self.comment == Comment.OPEN_COMMENT and cur_token_text == "\n":
+                self.comment = Comment.NOT_COMMENT
+                return self.advance()
+            elif self.comment != Comment.NOT_COMMENT or cur_token_text == "\n":
+                return self.advance()
+            else:
+                token_type = self.token_type(cur_token_text)
+                cur_token_text = self.process_token(cur_token_text, token_type)
+                return Token(cur_token_text, token_type)
+        return None
+
 
     def token_type(self, token_text) -> str:
         """
@@ -212,8 +235,8 @@ class JackTokenizer:
         Returns:
             str: the keyword which is the current token.
             Should be called only when token_type() is "KEYWORD".
-            Can return "CLASS", "METHOD", "FUNCTION", "CONSTRUCTOR", "INT", 
-            "BOOLEAN", "CHAR", "VOID", "VAR", "STATIC", "FIELD", "LET", "DO", 
+            Can return "CLASS", "METHOD", "FUNCTION", "CONSTRUCTOR", "INT",
+            "BOOLEAN", "CHAR", "VOID", "VAR", "STATIC", "FIELD", "LET", "DO",
             "IF", "ELSE", "WHILE", "RETURN", "TRUE", "FALSE", "NULL", "THIS"
         """
         return cur_token_text
@@ -224,7 +247,7 @@ class JackTokenizer:
             str: the character which is the current token.
             Should be called only when token_type() is "SYMBOL".
             Recall that symbol was defined in the grammar like so:
-            symbol: '{' | '}' | '(' | ')' | '[' | ']' | '.' | ',' | ';' | '+' | 
+            symbol: '{' | '}' | '(' | ')' | '[' | ']' | '.' | ',' | ';' | '+' |
               '-' | '*' | '/' | '&' | '|' | '<' | '>' | '=' | '~' | '^' | '#'
         """
         if cur_token_text == "<":
@@ -242,7 +265,7 @@ class JackTokenizer:
             str: the identifier which is the current token.
             Should be called only when token_type() is "IDENTIFIER".
             Recall that identifiers were defined in the grammar like so:
-            identifier: A sequence of letters, digits, and underscore ('_') not 
+            identifier: A sequence of letters, digits, and underscore ('_') not
                   starting with a digit. You can assume keywords cannot be
                   identifiers, so 'self' cannot be an identifier, etc'.
         """
@@ -263,10 +286,10 @@ class JackTokenizer:
     def string_val(self, cur_token_text) -> str:
         """
         Returns:
-            str: the string value of the current token, without the double 
+            str: the string value of the current token, without the double
             quotes. Should be called only when token_type() is "STRING_CONST".
             Recall that StringConstant was defined in the grammar like so:
-            StringConstant: '"' A sequence of Unicode characters not including 
+            StringConstant: '"' A sequence of Unicode characters not including
                       double quote or newline '"'
         """
         return cur_token_text[1:-1]
@@ -285,3 +308,8 @@ class Token:
 
     def token_string(self) -> str:
         return f'<{self.type}> {self.text} </{self.type}>\n'
+
+class Comment(Enum):
+    NOT_COMMENT = 0
+    CLOSED_COMMENT = 1
+    OPEN_COMMENT = 2

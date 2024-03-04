@@ -242,19 +242,14 @@ class CompilationEngine:
             return
         self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # label L1 if no else
 
-    def compile_expression(self) -> int:
+    def compile_expression(self) -> None:
         """Compiles an expression."""
-        self.cur_indent = +1
-        self.write_indent()
-        self.output_stream.write("<expression>\n")
         self.compile_term()
-        while self.cur_token.text in JackTokenizer.OPERATORS:
-            self.eat(text=JackTokenizer.OPERATORS, check_text= True)
+        while self.cur_token.text in JackTokenizer.BINARY_OPERATORS:
+            op = self.cur_token.text
+            self.cur_token = next(self.tokenizer.token_generator())
             self.compile_term()
-        self.write_indent()
-        self.output_stream.write("</expression>\n")
-        self.cur_indent = -1
-        return 0
+            self.writer.write_arithmetic(op)
 
     def compile_term(self) -> None:
         """Compiles a term.
