@@ -36,7 +36,7 @@ class CompilationEngine:
         self.class_name = self.cur_token.text
         self.table = SymbolTable.SymbolTable()
         self.cur_func = None
-        self.writer= VMWriter.VMWriter(output_stream)
+        self.writer = VMWriter.VMWriter(output_stream)
 
     def compile_class(self) -> None:
         # """Compiles a complete class."""
