@@ -157,21 +157,18 @@ class CompilationEngine:
 
     def compile_do(self) -> None:
         """Compiles a do statement."""
-        next(self.tokenizer.token_generator())  # do
-        name = ""
         self.cur_token = next(self.tokenizer.token_generator())  # class name
-        name += self.cur_token
+        name = ""
         self.cur_token = next(self.tokenizer.token_generator())  # ./(
         if self.cur_token and self.cur_token.text == ".":
             name += "."
             self.cur_token = next(self.tokenizer.token_generator())  # subroutine name
-            name += self.cur_token
+            name += self.cur_token.text
 
-        next(self.tokenizer.token_generator())  # (
+        self.cur_token = next(self.tokenizer.token_generator())  # (
         n_args: int = self.compile_expression_list()
-        next(self.tokenizer.token_generator())  # )
-        next(self.tokenizer.token_generator())  # ;
-        self.writer.write_call(name,n_args)
+        self.cur_token = next(self.tokenizer.token_generator())  # ;
+        self.writer.write_call(name, n_args)
 
     def compile_let(self) -> None:
         """Compiles a let statement."""

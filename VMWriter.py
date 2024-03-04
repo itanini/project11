@@ -12,7 +12,7 @@ class VMWriter:
     """
     Writes VM commands into a file. Encapsulates the VM command syntax.
     """
-    COMMAND_DICT ={'+':'add', '-': 'sub', '=': 'eq', '>': 'gt', '<':'le', '&':'and', '|': 'or', '~': 'not'}
+    COMMAND_DICT ={'+':'add', '-': 'sub', '=': 'eq', '>': 'gt', '<':'le', '&':'and', '|': 'or', '~': 'not', '*':'mult'}
 
     def __init__(self, output_stream: typing.TextIO) -> None:
         """Creates a new file and prepares it for writing VM commands."""
