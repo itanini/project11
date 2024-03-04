@@ -79,7 +79,7 @@ class CompilationEngine:
             return
         while self.cur_token.text in ["constructor", "function", "method"]:  # compile all function in class
             self.cur_token = next(self.tokenizer.token_generator())  # return type
-            self.cur_token = next(self.tokenizer.token_generator())
+            self.next_token()
             self.cur_func = self.cur_token.text
             self.cur_token = next(self.tokenizer.token_generator())  # (
             n_args = self.compile_parameter_list()
@@ -125,18 +125,18 @@ class CompilationEngine:
     def compile_var_dec(self) -> None:
         """Compiles a var declaration."""
         kind = "VAR"
-        self.cur_token = next(self.tokenizer.token_generator())
+        self.next_token()
         type = self.cur_token.text
-        self.cur_token = next(self.tokenizer.token_generator())
+        self.next_token()
         name = self.cur_token.text
         self.table.define(name, type, kind)
         self.cur_token = next(self.tokenizer.token_generator()) # ,\;
         while self.cur_token.text == ",":
-            self.cur_token = next(self.tokenizer.token_generator())
+            self.next_token()
             name = self.cur_token.text
             self.table.define(name, type, kind)
-            self.cur_token = next(self.tokenizer.token_generator())
-        self.cur_token = next(self.tokenizer.token_generator())
+            self.next_token()
+        self.next_token()
 
     def compile_statements(self) -> None:
         """Compiles a sequence of statements, not including the enclosing
@@ -174,8 +174,9 @@ class CompilationEngine:
 
     def compile_let(self) -> None:
         """Compiles a let statement."""
-        next(self.tokenizer.token_generator())  # let
-        name = next(self.tokenizer.token_generator())
+        self.cur_token = next(self.tokenizer.token_generator())  # let
+        self.next_token()
+        name = self.cur_token.text
         if self.cur_token and self.cur_token.text == "[":  #TODO
 
             self.eat(text=["["], check_text=True)
@@ -219,22 +220,22 @@ class CompilationEngine:
 
     def compile_if(self) -> None:
         """Compiles a if statement, possibly with a trailing else clause."""
-        next(self.tokenizer.token_generator())  # if
-        next(self.tokenizer.token_generator())  # (
+        self.cur_token =  next(self.tokenizer.token_generator())  # if
+        self.cur_token =  next(self.tokenizer.token_generator())  # (
         self.compile_expression()
-        next(self.tokenizer.token_generator())  # )
+        self.cur_token =  next(self.tokenizer.token_generator())  # )
         self.writer.write_arithmetic("neg")  # if not expression
         self.writer.write_goto(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # go to label 1
-        next(self.tokenizer.token_generator())  # {
+        self.cur_token =  next(self.tokenizer.token_generator())  # {
         self.compile_statements()  # needs more than that
-        next(self.tokenizer.token_generator())  # }
+        self.cur_token =  next(self.tokenizer.token_generator())  # }
         if self.cur_token and self.cur_token.text == "else":
             self.writer.write_goto(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER+1}')  # go to label L2
             self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # label L1
-            next(self.tokenizer.token_generator())  # else
-            next(self.tokenizer.token_generator())  # {
+            self.cur_token =  next(self.tokenizer.token_generator())  # else
+            self.cur_token =  next(self.tokenizer.token_generator())  # {
             self.compile_statements()  # needs more than that
-            next(self.tokenizer.token_generator())  # }
+            self.cur_token =  next(self.tokenizer.token_generator())  # }
             self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER+1}')  # label L2
             return
         self.writer.write_label(f'{self.cur_func}.{self.class_name}.{CompilationEngine.COUNTER}')  # label L1 if no else
@@ -244,7 +245,7 @@ class CompilationEngine:
         self.compile_term()
         while self.cur_token.text in JackTokenizer.BINARY_OPERATORS:
             op = self.cur_token.text
-            self.cur_token = next(self.tokenizer.token_generator())
+            self.next_token()
             self.compile_term()
             self.writer.write_arithmetic(op)
 
@@ -259,17 +260,40 @@ class CompilationEngine:
         part of this term and should not be advanced over.
         """
 
-        if self.cur_token.type in ["stringConstant":
-            self.eat(typ= ["stringConstant", "integerConstant"], check_type=True)
-
-        elif self.cur_token.text in ['true', 'false', 'null', 'this']:
-            self.eat(text=['true', 'false', 'null', 'this'], check_text= True)
+        if self.cur_token.text == "(":
+            self.next_token()
+            self.compile_expression()
+            self.next_token()
+        elif self.cur_token.type == "integerConstant":
+            self.writer.write_push("constant", int(self.cur_token.text))
+            self.next_token()
+        elif self.cur_token.type == "stringConstant":
+            self.writer.write_push("constant", len(self.cur_token.text))
+            self.writer.write_call('String.new', 1)
+            for char in self.cur_token.text:
+                self.writer.write_push("constant",ord(char))
+                self.writer.write_call('String.appendChar', 2)
+            self.next_token()
+        elif self.cur_token.text in ['true', 'false', 'null']:
+            self.writer.write_push("constant", 0)
+            if self.cur_token.text == 'true':
+                self.writer.write_arithmetic("not")
+            self.next_token()
+        elif self.cur_token.text == "this":
+            self.writer.write_push("pointer", 0)
+            self.next_token()
         elif self.cur_token.type == "identifier":
-            self.eat(typ= ["identifier"], check_type= True)
+            name = self.cur_token.text
+            self.next_token()
             if self.cur_token.text == '[':
-                self.eat(text=['['], check_text= True)
+                self.next_token()
                 self.compile_expression()
-                self.eat(text=[']'], check_text=True)
+                self.writer.write_push(self.table.kind_of(name), self.table.index_of(name))
+                self.writer.write_arithmetic('add')
+                # rebase 'that' to point to var+index
+                self.writer.write_pop('pointer', 1)
+                self.writer.write_push('that', 0)
+                self.next_token()  # ]
             elif self.cur_token.text == '(':
                 self.eat(text=['('], check_text=True)
                 self.compile_expression_list()
@@ -282,15 +306,13 @@ class CompilationEngine:
                 self.eat(text= [')'], check_text=True)
 
         elif self.cur_token.text in ['-', '~']:
-            self.eat(text= ['-', '~'], check_text=True)
+            op = self.cur_token.text
+            self.next_token()
             self.compile_term()
-        elif self.cur_token.text == '(':
-            self.eat(text= ['('], check_text= True)
-            self.compile_expression()
-            self.eat(text=[')'], check_text=True)
-        self.write_indent()
-        self.output_stream.write("</term>\n")
-        self.cur_indent = -1
+            self.writer.write_arithmetic(op)
+
+    def next_token(self):
+        self.cur_token = next(self.tokenizer.token_generator())
 
     def compile_expression_list(self) -> int:  # should count how many arguments are in the function
         """Compiles a (possibly empty) comma-separated list of expressions."""
@@ -325,6 +347,6 @@ class CompilationEngine:
             #     raise Exception(f'Expected to get a token from {text} but got {self.cur_token.text} instead')
             self.write_indent()
             self.output_stream.write(self.cur_token.token_string())
-            self.cur_token = next(self.tokenizer.token_generator())
+            self.next_token()
             return
         raise Exception("NO TOKEN TO WRITE")
