@@ -80,7 +80,7 @@ class CompilationEngine:
             return
         while self.cur_token.text in ["constructor", "function", "method"]:  # compile all function in class
             self.cur_token = next(self.tokenizer.token_generator())  # return type
-            self.cur_token = next(self.tokenizer.token_generator())
+            self.next_token()
             self.cur_func = self.cur_token.text
             self.cur_token = next(self.tokenizer.token_generator())  # (
             n_args = self.compile_parameter_list()
@@ -106,7 +106,7 @@ class CompilationEngine:
         # add args to symbol table:
         kind = "ARG"
         type = self.cur_token.text
-        self.cur_token = next(self.tokenizer.token_generator())  # name
+        self.cur_token = next(self.tokenizer.token_generator()) # name
         name = self.cur_token.text
         self.table.define(name, type, kind)
         self.writer.write_push("argument", self.table.index_of(name))
@@ -126,18 +126,18 @@ class CompilationEngine:
     def compile_var_dec(self) -> None:
         """Compiles a var declaration."""
         kind = "VAR"
-        self.cur_token = next(self.tokenizer.token_generator())
+        self.next_token()
         type = self.cur_token.text
-        self.cur_token = next(self.tokenizer.token_generator())
+        self.next_token()
         name = self.cur_token.text
         self.table.define(name, type, kind)
         self.cur_token = next(self.tokenizer.token_generator()) # ,\;
         while self.cur_token.text == ",":
-            self.cur_token = next(self.tokenizer.token_generator())
+            self.next_token()
             name = self.cur_token.text
             self.table.define(name, type, kind)
-            self.cur_token = next(self.tokenizer.token_generator())
-        self.cur_token = next(self.tokenizer.token_generator())
+            self.next_token()
+        self.next_token()
 
     def compile_statements(self) -> None:
         """Compiles a sequence of statements, not including the enclosing
@@ -157,20 +157,21 @@ class CompilationEngine:
 
     def compile_do(self) -> None:
         """Compiles a do statement."""
-        self.cur_token = next(self.tokenizer.token_generator())  # class name
+        next(self.tokenizer.token_generator())  # do
         name = ""
-        name += self.cur_token.text
+        self.cur_token = next(self.tokenizer.token_generator())  # class name
+        name += self.cur_token
         self.cur_token = next(self.tokenizer.token_generator())  # ./(
         if self.cur_token and self.cur_token.text == ".":
             name += "."
             self.cur_token = next(self.tokenizer.token_generator())  # subroutine name
-            name += self.cur_token.text
+            name += self.cur_token
 
         next(self.tokenizer.token_generator())  # (
         n_args: int = self.compile_expression_list()
         next(self.tokenizer.token_generator())  # )
         next(self.tokenizer.token_generator())  # ;
-        self.writer.write_call(name, n_args)
+        self.writer.write_call(name,n_args)
 
     def compile_let(self) -> None:
         """Compiles a let statement."""

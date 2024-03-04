@@ -12,6 +12,7 @@ class VMWriter:
     """
     Writes VM commands into a file. Encapsulates the VM command syntax.
     """
+    COMMAND_DICT ={'+':'add', '-': 'sub', '=': 'eq', '>': 'gt', '<':'le', '&':'and', '|': 'or', '~': 'not'}
 
     def __init__(self, output_stream: typing.TextIO) -> None:
         """Creates a new file and prepares it for writing VM commands."""
@@ -48,7 +49,7 @@ class VMWriter:
             command (str): the command to write, can be "ADD", "SUB", "NEG", 
             "EQ", "GT", "LT", "AND", "OR", "NOT", "SHIFTLEFT", "SHIFTRIGHT".
         """
-        self.output_stream.write(f'{command}\n')
+        self.output_stream.write(f'{VMWriter.COMMAND_DICT[command]}\n')
 
     def write_label(self, label: str) -> None:
         """Writes a VM label command.
