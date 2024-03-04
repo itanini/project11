@@ -259,7 +259,7 @@ class CompilationEngine:
         part of this term and should not be advanced over.
         """
 
-        if self.cur_token.type in ["stringConstant", "integerConstant"]:
+        if self.cur_token.type in ["stringConstant":
             self.eat(typ= ["stringConstant", "integerConstant"], check_type=True)
 
         elif self.cur_token.text in ['true', 'false', 'null', 'this']:
