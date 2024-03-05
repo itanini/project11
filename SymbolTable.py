@@ -65,7 +65,7 @@ class SymbolTable:
             str: the kind of the named identifier in the current scope, or None
             if the identifier is unknown in the current scope.
         """
-        return self.table[name]
+        return self.table.loc[name, "Kind"]
 
     def type_of(self, name: str) -> str:
         """

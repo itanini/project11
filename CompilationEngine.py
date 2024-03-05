@@ -65,6 +65,7 @@ class CompilationEngine:
             name = self.cur_token.text
             self.table.define(name, type, kind)
             self.cur_token = next(self.tokenizer.token_generator())  # ,\ ;
+        self.next_token()
         if self.cur_token.text in ["static", "field"]:
             self.compile_class_var_dec()
         self.compile_subroutine()
@@ -146,13 +147,13 @@ class CompilationEngine:
         while self.cur_token.text in ["let", "do", "if", "while", "return"]:
             if self.cur_token.text == "let":
                 self.compile_let()
-            if self.cur_token.text == "do":
+            elif self.cur_token.text == "do":
                 self.compile_do()
-            if self.cur_token.text == "if":
+            elif self.cur_token.text == "if":
                 self.compile_if()
-            if self.cur_token.text == "while":
+            elif self.cur_token.text == "while":
                 self.compile_while()
-            if self.cur_token.text == "return":
+            elif self.cur_token.text == "return":
                 self.compile_return()
 
     def compile_do(self) -> None:
@@ -188,7 +189,7 @@ class CompilationEngine:
             self.writer.write_push("temp", 0)
             self.writer.write_pop("that", 0)
 
-        next(self.tokenizer.token_generator())  # =
+        self.cur_token = next(self.tokenizer.token_generator())  # =
         self.compile_expression()
         self.writer.write_pop(self.table.kind_of(name), self.table.index_of(name))  # pop the first value in the stuck
         self.cur_token = next(self.tokenizer.token_generator())  # ;
@@ -291,21 +292,22 @@ class CompilationEngine:
                 self.compile_expression()
                 self.writer.write_push(self.table.kind_of(name), self.table.index_of(name))
                 self.writer.write_arithmetic('add')
-                # rebase 'that' to point to var+index
                 self.writer.write_pop('pointer', 1)
                 self.writer.write_push('that', 0)
                 self.next_token()  # ]
             elif self.cur_token.text == '(':
-                self.eat(text=['('], check_text=True)
+                self.next_token() # (
                 self.compile_expression_list()
-                self.eat(text=[')'], check_text=True)
+                self.next_token()  #  )
             elif self.cur_token.text == '.':
-                self.eat(text = ['.'], check_text= True)
-                self.eat(typ=['identifier'], check_type= True)
-                self.eat(text=['('], check_text=True)
-                self.compile_expression_list()
-                self.eat(text= [')'], check_text=True)
-
+                self.writer.write_push(self.table.kind_of(name), self.table.index_of(name))
+                self.next_token() # .
+                self.cur_func= self.cur_token.text
+                self.next_token()# function name
+                self.next_token() # (
+                n_args = self.compile_expression_list()
+                self.next_token() # )
+                self.writer.write_call(self.cur_func, n_args)
         elif self.cur_token.text in ['-', '~']:
             op = self.cur_token.text
             self.next_token()
