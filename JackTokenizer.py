@@ -27,9 +27,10 @@ LIST_SEPARATOR=[',']
 STATEMENT_TERMINATOR = [';']
 CLASS_MEMBERSHIP = ['.']
 OPERATORS = ['+','-','*','/','&amp;','|','~', '&lt;','&gt;','^','#',"="]
-BINARY_OPERATORS = ['+','-','*','/','<','>']
+BINARY_OPERATORS = ['+','-','*','/','<','>', '=']
 SYMBOLS = set(ARITHMETIC_GROUPING+ARRAY_INDEXING+STATEMENT_GROUPING+LIST_SEPARATOR+STATEMENT_TERMINATOR+
               CLASS_MEMBERSHIP+OPERATORS+ ['<', '>', '&'])
+CLASS_NAMES = ["String"]
 
 PROGRAM_COMPONENTS = ['class', 'constructor', 'method', 'function']
 PRIMITIVE_TYPES = ['int', 'boolean', 'char', 'void']
@@ -216,7 +217,7 @@ class JackTokenizer:
             str: the type of the current token, can be
             "KEYWORD", "SYMBOL", "IDENTIFIER", "INT_CONST", "STRING_CONST"
         """
-        if token_text in SYMBOLS:
+        if token_text in SYMBOLS or token_text in CLASS_NAMES:
             return "symbol"
         elif token_text in KEYWORD:
             return "keyword"
